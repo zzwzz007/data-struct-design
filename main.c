@@ -1,12 +1,11 @@
 #include "cnfparser.h"
 
 int main(){
-	printf("1\n" );
-	Formula *F;
-	F=(Formula *)malloc(sizeof(Formula));
-	printf("number of clause:\n");
-	int i;
-	scanf("%d",&i);
-	ReadToFormula(F,i);
+	char filename[30];
+	printf("input the name of file:");
+	scanf("%s",filename);
+	int litnum,clunum;
+	Clause *F=ReadToFormula(filename,&litnum,&clunum);
+	
 	return 0;
 }
