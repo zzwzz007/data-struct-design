@@ -1,39 +1,78 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define NEG -1
-#define UNKNOWN 0
+#define UNKNOWN -1
+#define YES 1
+#define NO 0
+#define ERROR -1
+#define FINISHED 1
+typedef int status;
 
 void PrintMenu(int n){
 	switch(n) {
 		case 1:
 			printf("Choose Function: \n1.CNF solver\n");
 		case 2:
-			printf("input the name of file:");
+			printf("input the name of file(not include .cnf):");
 	}
 }
-
-int ResultPrint(int model[], int litnum) {
-	printf("> INFO: Now asSignment model:\n");
-	for(int i = 0; i < litnum; i++) {
-		printf("---");
+void ResultPrint(int result, int model[], int litnum, char *filename,double time) {
+	FILE *fp;
+	if ((fp=fopen(filename,"wt"))==NULL) {
+		printf("File open error!\n ");
+		exit(-1);
 	}
-	printf("--------\n Varible:");
-	for(int i = 0; i < litnum; i++) {
-		printf("%2d ", i + 1);
-	}
-	printf("\nAsSign: ");
-	for(int i = 0; i < litnum; i++) {
-		if(model[i] != UNKNOWN) {
-			printf("%2d ", (model[i] + 1) / 2);
-		} else {
-			printf("%2c ", 'N');
+	if(result==1){
+		printf("Found solution!\n");
+		printf("Assign model:\n");
+		printf("------------------------------------------------------------\n");
+		printf("Varible:");
+		for(int i = 1; i <= litnum; i++) {
+			printf("%2d ", i);
+		}
+		printf("\nAssign: ");
+		for(int i = 0; i < litnum; i++) {
+			if(model[i] != UNKNOWN) 
+				printf("%2d ", model[i]);
+			else 
+				printf("%2c", 'N');
+		}
+		printf("\n");
+		printf("------------------------------------------------------------\n");
+		
+		fprintf(fp, "s 1\nv ");
+		for(int i = 1; i <= litnum; i++){
+			if(model[i-1]==1) fprintf(fp, "%d ", i);
+			else if(model[i-1]==0) fprintf(fp, "-%d ", i);
+			else fprintf(fp, "+-%d ", i);
 		}
 	}
-	printf("\n");
-	for(int i = 0; i < litnum; i++) {
-		printf("---");
+	else if(result==-1){
+		//no sollution
+		printf("No solution was founded!\n");
+		fprintf(fp, "s 0");
 	}
-	printf("--------\n");
+	else{
+		//have at least one unknown
+		printf("Could not decide the solution!\n");
+		fprintf(fp, "s -1");
+	}
+	fprintf(fp, "\nt %lf\n", time);
+	fclose(fp);
+}
+double Timeout(clock_t start, clock_t finish){
+	return ((double)(finish - start) / CLOCKS_PER_SEC);
+}
+
+void IsAllAssign(int model[], int *result, int litnum){
+	int i;
+	for(i = 0;i < litnum; i++){
+		if(model[i] == UNKNOWN){
+			*result=0;
+			break;
+		}
+	}
 }
