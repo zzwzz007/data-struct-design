@@ -1,23 +1,35 @@
 #include "cnfparser.h"
 
+#define SATISFIED 1
+#define SHRUNK 0
+
 int Abs(int num) {
 	return num > 0 ? num : -num;
 }
+int log2(int num) {
+	int res;
+	while(num>1) {
+		num/=2;
+		res++;
+	}
+	return res;
+}
 status IsEmptyClause(Clause *C) {
-	if(C->firstliteral==NULL) 
+	if(C->firstliteral==NULL)
 		return YES;
-	else 
+	else
 		return NO;
 }//IsEmptyClause
 status IsUnitClause(Clause *C) {
-	if(C->firstliteral && !C->firstliteral->nextliteral) 
+	if(C->firstliteral && !C->firstliteral->nextliteral)
 		return YES;
-	else 
+	else
 		return NO;
 }//IsUnitClause
 Clause *CopyClause(Clause *C) {
 	Clause *ccopy = (Clause *)malloc(sizeof(Clause));
 	ccopy->nextclause = NULL;
+	ccopy->is_satisfied = C->is_satisfied;
 	if (IsEmptyClause(C)) {
 		//empty clause
 		ccopy->firstliteral = NULL;
@@ -76,8 +88,7 @@ status DestroyClause(Clause **F,Clause **precla,Clause **cla) {
 		free((*cla));
 		(*cla) = (*F);
 		if (*F == NULL) return FINISHED;// finish dpll.
-	}
-	else {
+	} else {
 		//latter lit
 		(*precla)->nextclause = (*cla)->nextclause;
 		free((*cla));
@@ -97,20 +108,25 @@ status SortFormula(Clause **F, int num) {
 	Literal *lit, *prelit;
 	int flag;
 	while (cla) {
-		if (IsEmptyClause(cla)) 
+		if (IsEmptyClause(cla))
 			return ERROR;
+		if(cla->is_satisfied == YES) {
+			cla = cla->nextclause;
+			continue;
+		}
 		flag = 0;//if del cla
 		lit = cla->firstliteral;
 		prelit = cla->firstliteral;
 		while(lit) {
 			if (lit->data == -num) {
 				//del lit
-				if (Removeliteral(&cla,&prelit,&lit)==ERROR) 
+				if (Removeliteral(&cla,&prelit,&lit)==ERROR)
 					return ERROR;
 				continue;
 			} else if (lit->data == num) {
 				//cla ok, del cla
-				if(DestroyClause(F,&precla,&cla)==FINISHED) 
+				cla->is_satisfied = YES;
+				if(DestroyClause(F,&precla,&cla)==FINISHED)
 					return FINISHED;
 				flag = 1;//del
 				break;
@@ -182,7 +198,51 @@ int Nextliteral(Clause * F, int litnum) {
 	}
 	return next;
 }//Nextliteral
-status DPLL(Clause * F, int litnum, int model[]) {
+
+void SetVar(Formula F,int v) {
+	int i;
+	int p = Abs(v), q = (v>0) ? SATISFIED : SHRUNK;
+	F->lit[p].pos_occur++;
+	for(i = 0; i < F->lit[p].pos_occur; i++) {
+		//遍历所有含v的子句
+		int j = F->lit[p].pos_in_clauses[i];//遍历
+		if(F->cla[j].is_satisfied) continue;
+		F->cla[j].is_satisfied = YES;
+		F->changes[changes_index++].clause_index = j;
+//		n_changes[depth][SATISFIED]++;
+	}
+	for(i = 0; i < F->lit[p].neg_occur; i++) {
+		int j = F->lit[p].neg_in_clauses[i];
+		if(F->cla[j].is_satisfied) continue;
+		int k = F->lit[p].neg_in_locs[i];
+		F->cla[j].current_length--;
+		clauses[j].binary_code -= ((1 << k));
+		F->changes[changes_index].clause_index = j;
+		F->changes[changes_index++].literal_index = k;
+//		n_changes[depth][SHRUNK]++;
+		if(F->cla[j].current_length == 1) {
+			int loc = int(log2(F->cla[j].binary_code));
+			int w = F->cla[j].literals[loc];
+			int s = Abs(w), t = (w>0) ? SATISFIED : SHRUNK;
+			linfo[s][t].antecedent_clause = j;
+			if(linfo[s][(!t)].is_unit == YES) {
+				contradictory_unit_clauses = TRUE;
+				conflicting_literal = w;
+			} else if(linfo[s][t].is_unit == NO) {
+				gucl_stack[n_gucl] = clauses[j].current_ucl = w;
+				linfo[s][t].is_unit = YES;
+				++n_gucl;
+			}
+		}
+	}
+	if(depth && backtrack_level == depth-1)
+		++backtrack_level;
+	++depth;
+	linfo[p][SATISFIED].is_assigned = YES;
+	linfo[p][SHRUNK].is_assigned = YES;
+}
+
+status DPLL(Clause * F, int litnum, int model[], changes_info *changes, int *change_index, int *pos_change, int *neg_change) {
 	//dpll algorithm
 	Clause * Fornew = CopyFormula(F);//copy the former formula
 	Clause *cla;
@@ -216,7 +276,7 @@ status DPLL(Clause * F, int litnum, int model[]) {
 	if (!Fornew) return FINISHED;// empty, success.
 	int litnext = Nextliteral(Fornew, litnum);// choose next lit
 	AddClause(&Fornew, litnext);
-	if(DPLL(Fornew, litnum, model) == 1) {
+	if(DPLL(Fornew, litnum, model, changes, change_index, pos_change,neg_change) == 1) {
 		//ok
 		DestroyFormula(Fornew);
 		return FINISHED;
@@ -227,6 +287,6 @@ status DPLL(Clause * F, int litnum, int model[]) {
 		free(bak->firstliteral);
 		free(bak);//delete the former assign
 		AddClause(&Fornew, -litnext);
-		return DPLL(Fornew, litnum, model);
+		return DPLL(Fornew, litnum, model, changes, change_index, pos_change,neg_change);
 	}
 }//DPLL

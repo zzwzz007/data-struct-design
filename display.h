@@ -9,6 +9,7 @@
 #define NO 0
 #define ERROR -1
 #define FINISHED 1
+
 typedef int status;
 
 void PrintMenu(int n){
