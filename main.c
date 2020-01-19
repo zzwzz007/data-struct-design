@@ -1,4 +1,4 @@
-#include "cnfparser.h"
+#include "solver.h"
 
 int main() {
 //	PrintMenu(1);
@@ -17,6 +17,9 @@ int main() {
 	filename[last+4]='\0';//rename
 	int litnum,clunum;
 	Formula *F = ReadToFormula(filename,&litnum,&clunum);
+	if(dpll(F)) printf("yeah!!!!!!!!!!!!!!!!!!!!");
+	for(int i=1;i<=F->litnum;i++)
+	printf("%d  ",F->assign[i].type);
 //	int *model = (int *)malloc(litnum * sizeof(int));
 //	for (int i = 0; i < litnum; i++)
 //		model[i] = UNKNOWN;
