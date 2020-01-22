@@ -17,12 +17,12 @@ int main() {
 	filename[last+4]='\0';//rename
 	int litnum,clunum;
 	Formula *F = ReadToFormula(filename,&litnum,&clunum);
-	if(dpll(F)) printf("yeah!!!!!!!!!!!!!!!!!!!!");
+	if(dpll(F)) printf("yeah!!!!!!!!!!!!!!!!!!!!\n");
 	for(int i=1;i<=F->litnum;i++)
-	printf("%d  ",F->assign[i].type);
-//	int *model = (int *)malloc(litnum * sizeof(int));
-//	for (int i = 0; i < litnum; i++)
-//		model[i] = UNKNOWN;
+	printf("%2d ",i);
+	printf("\n");
+	for(int i=1;i<=F->litnum;i++)
+	printf("%2d ",F->assign[i].type);
 //	clock_t start,finish;
 //	start = clock();
 //	int result = DPLL_Pre(F, litnum, clunum, model);

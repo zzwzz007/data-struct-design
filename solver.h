@@ -1,7 +1,7 @@
 #include "cnfparser.h"
 #define TRUE 1
 #define FALSE 0
-#define UNASSIGNED 0
+
 int logto2(int num) {
 	int res=1;
 	while(num>1) {
@@ -13,13 +13,14 @@ int logto2(int num) {
 int GetNextlit(Formula *F){
 	int max=0,rec,more;
 	for(int i=1;i<=F->litnum;i++){
-		if(F->lit[i][0].assign == YES) continue;
-		rec=F->lit[i][0].occur + F->lit[i][1].occur;
-		if(rec>max){
-			max=rec;
-			if(F->lit[i][0].occur > F->lit[i][1].occur)//more -
-				more=-i;
-			else more=i;
+		if(F->assign[i].decision == ASSIGN_NONE){
+			rec=F->lit[i][0].occur + F->lit[i][1].occur;
+			if(rec>max){
+				max=rec;
+				if(F->lit[i][0].occur > F->lit[i][1].occur)//more -
+					more=-i;
+				else more=i;
+			}
 		}
 	}
 	return more;
@@ -34,7 +35,8 @@ void SetVar(Formula *F,int v) {
 		if(F->cla[j].is_satisfied == YES) continue;
 		F->cla[j].is_satisfied = YES;
 		--F->r_clunum;
-		F->changes[F->changes_index++].clause_index = j;
+		F->changes[F->changes_index].clause_index = j;
+		F->changes_index++;
 		F->n_changes[F->depth][SATISFIED]++;
 	}
 	q = !q;
@@ -56,7 +58,8 @@ void SetVar(Formula *F,int v) {
 				F->contradictory_unit_clauses = TRUE;
 				F->conflicting_literal = w;
 			} else if(F->lit[s][t].is_unit == NO) {
-				F->gucl_stack[F->n_gucl] = F->cla[j].current_ucl = w;
+				F->gucl_stack[F->n_gucl] = w;
+				F->cla[j].current_ucl = w;
 				F->lit[s][t].is_unit = YES;
 				++F->n_gucl;
 			}
@@ -86,7 +89,7 @@ void UnSetVar(Formula *F, int v) {
 			F->lit[s][t].is_unit = NO;
 			F->cla[j].current_ucl = 0;
 		}
-		F->cla[j].binary_code += ((1 << k));
+		F->cla[j].binary_code += ((1 << (k-1)));
 	}
 	while(F->n_changes[F->depth][SATISFIED]) {
 		--F->n_changes[F->depth][SATISFIED];
@@ -104,16 +107,17 @@ int dpll(Formula *F) {
 	unsigned int n_lucl = 0;
 	while(1) {
 		if(F->contradictory_unit_clauses) {
-			F->icl_cnt = 0;
+			F->n_study = 0;
 			int cl = Abs(F->conflicting_literal);
-			F->impl_clauses[F->icl_cnt++] = F->lit[cl][SATISFIED].antecedent_clause;
-			F->impl_clauses[F->icl_cnt++] = F->lit[cl][SHRUNK].antecedent_clause;
+			F->study_stack[F->n_study++] = F->lit[cl][SATISFIED].antecedent_clause;
+			F->study_stack[F->n_study++] = F->lit[cl][SHRUNK].antecedent_clause;
 			F->assign[cl].decision = ASSIGN_NONE;
+			F->assign[cl].type = UNASSIGNED;
 			while(n_lucl) {
 				UnSetVar(F,lucl_stack[--n_lucl]);
 				int s = Abs(lucl_stack[n_lucl]);
 				int t = lucl_stack[n_lucl]>0 ? TRUE : FALSE;
-				F->impl_clauses[F->icl_cnt++] = F->lit[s][t].antecedent_clause;
+				F->study_stack[F->n_study++] = F->lit[s][t].antecedent_clause;
 				F->assign[s].type = UNASSIGNED;
 				F->assign[s].decision = ASSIGN_NONE;
 			}
@@ -141,22 +145,23 @@ int dpll(Formula *F) {
 	if(dpll(F)) return SAT;
 	//error
 	UnSetVar(F,v);
-	F->assign[Abs(v)].decision = ASSIGN_NONE;
+	// F->assign[Abs(v)].type = UNASSIGNED;
+	
 	int max_depth = 0, i, j, k, m, left = FALSE;
-	if(F->icl_cnt) {
-		while(F->icl_cnt) {
-			i = F->impl_clauses[--F->icl_cnt];
+	if(F->n_study) {
+		while(F->n_study) {
+			F->n_study--;
+			i = F->study_stack[F->n_study];
 			k = F->cla[i].original_length;
 			for(j=1; j <= k; ++j) {
 				m = Abs(F->cla[i].literals[j]);
-				if(F->assign[m].decision == ASSIGN_BRANCHED &&
-				        F->assign[m].depth > max_depth)
+				if((F->assign[m].decision == ASSIGN_BRANCHED) && (F->assign[m].depth > max_depth))
 					max_depth = F->assign[m].depth;
 			}
 		}
 		left = TRUE;
-	}
-
+		}
+	F->assign[Abs(v)].decision = ASSIGN_NONE;
 	// ++n_backtracks;
 	if(F->backtrack_level >= F->depth-1) {
 		F->assign[Abs(v)].type = !F->assign[Abs(v)].type;
@@ -166,9 +171,10 @@ int dpll(Formula *F) {
 		UnSetVar(F,-v);
 		F->assign[Abs(v)].type = UNASSIGNED;
 		F->assign[Abs(v)].decision = ASSIGN_NONE;
-		if(left && F->icl_cnt) {
-			while(F->icl_cnt) {
-				i = F->impl_clauses[--F->icl_cnt];
+		if(left && F->n_study) {
+			while(F->n_study) {
+				F->n_study--;
+				i = F->study_stack[F->n_study];
 				k = F->cla[i].original_length;
 				for(j=1; j <= k; ++j) {
 					m = Abs(F->cla[i].literals[j]);
@@ -182,9 +188,10 @@ int dpll(Formula *F) {
 
 		}
 	}
-	F->icl_cnt = 0;
+	F->n_study = 0;
 	while(n_lucl) {
-		int z = lucl_stack[--n_lucl];
+		n_lucl--;
+		int z = lucl_stack[n_lucl];
 		UnSetVar(F,z);
 		F->assign[Abs(z)].type = UNASSIGNED;
 		F->assign[Abs(z)].decision = ASSIGN_NONE;

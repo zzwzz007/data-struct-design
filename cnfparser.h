@@ -18,6 +18,7 @@
 #define ASSIGN_IMPLIED 1
 #define ASSIGN_NONE 0
 #define ASSIGN_BRANCHED -1
+#define UNASSIGNED -1
 
 typedef int status;
 
@@ -68,8 +69,8 @@ typedef struct Formula{
 	int backtrack_level;
 	int max_depth;
 
-	int *impl_clauses;//stack of error clause
-	int icl_cnt;//stack size
+	int *study_stack;//stack of error clause
+	int n_study;//stack size
 
 	int **n_changes;
 }Formula;
@@ -132,21 +133,25 @@ Formula *ReadToFormula(char *filename,int *litnum,int *clunum) {
 
 	F->gucl_stack = (int *)malloc(sizeof(int)*(*litnum)*2);
 	F->n_gucl = 0;
+	F->gucl_stack[0] = 0;
 
 	F->depth = 0;
 	F->backtrack_level = 0;
 	F->max_depth = 0;
 
-	F->impl_clauses = (int *)malloc(sizeof(int)*(*clunum));
-	F->icl_cnt = 0;
+	F->study_stack = (int *)malloc(sizeof(int)*(*clunum));
+	F->n_study = 0;
 
-	F->n_changes = (int **)malloc(sizeof(int)*(*litnum)*2);
+	F->n_changes = (int **)malloc(sizeof(int)*(*litnum)*(*litnum)*2);
 	for (int i = 0; i < (*litnum)*(*litnum); ++i)
 		F->n_changes[i] = (int *)malloc(sizeof(int)*2);
 	for (int i = 0; i < (*litnum); ++i)
 		for(int j=0;j<2;j++)
 			F->n_changes[i][j]=0;
 	for(int i = 1; i <= (*litnum); i++){
+		F->assign[i].decision = ASSIGN_NONE;
+		F->assign[i].type = UNASSIGNED;
+		F->assign[i].depth = -1;
 		for (int j = 0; j < 2; j++)
 		{
 			F->lit[i][j].assign = NO;
