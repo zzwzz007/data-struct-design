@@ -17,24 +17,28 @@ int main() {
 	filename[last+4]='\0';//rename
 	int litnum,clunum;
 	Formula *F = ReadToFormula(filename,&litnum,&clunum);
-	if(dpll(F)) printf("yeah!!!!!!!!!!!!!!!!!!!!\n");
-	for(int i=1;i<=F->litnum;i++)
-	printf("%2d ",i);
-	printf("\n");
-	for(int i=1;i<=F->litnum;i++)
-	printf("%2d ",F->assign[i].type);
-//	clock_t start,finish;
-//	start = clock();
+	clock_t start,finish;
+	start = clock();
+	int result = dpll(F);
+	finish = clock();
+	double t=Timeout(start,finish);
+	filename[last]='.';
+	filename[last+1]='r';
+	filename[last+2]='e';
+	filename[last+3]='s';
+	filename[last+4]='\0';//rename
+	ResultPrint(result, F, filename, t);
+	printf("Spent time:%lf s (CLOCKS_PER_SEC=%ld)", t ,CLOCKS_PER_SEC);
+
 //	int result = DPLL_Pre(F, litnum, clunum, model);
-//	finish = clock();
+//	
 //	IsAllAssign(model, &result, litnum);
-//	double t=Timeout(start,finish);
+//	
 //	filename[last]='.';
 //	filename[last+1]='r';
 //	filename[last+2]='e';
 //	filename[last+3]='s';
 //	filename[last+4]='\0';//rename
-//	ResultPrint(result, model, litnum, filename, t);
-//	printf("Spent time:%lf s (CLOCKS_PER_SEC=%ld)", t ,CLOCKS_PER_SEC);
+//	
 	return 0;
 }

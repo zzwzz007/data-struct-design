@@ -1,16 +1,5 @@
-#include <stdio.h>
-#include <malloc.h>
-#include <stdlib.h>
-#include <time.h>
 
-#define NEG -1
-#define UNKNOWN -1
-#define YES 1
-#define NO 0
-#define ERROR -1
-#define FINISHED 1
-
-typedef int status;
+#include "cnfparser.h"
 
 void PrintMenu(int n){
 	switch(n) {
@@ -20,7 +9,7 @@ void PrintMenu(int n){
 			printf("input the name of file(not include .cnf):");
 	}
 }
-void ResultPrint(int result, int model[], int litnum, char *filename,double time) {
+void ResultPrint(int result, Formula *F, char *filename,double time) {
 	FILE *fp;
 	if ((fp=fopen(filename,"wt"))==NULL) {
 		printf("File open error!\n ");
@@ -29,26 +18,21 @@ void ResultPrint(int result, int model[], int litnum, char *filename,double time
 	if(result==1){
 		printf("Found solution!\n");
 		printf("Assign model:\n");
-		printf("------------------------------------------------------------\n");
+		// printf("------------------------------------------------------------\n");
 		printf("Varible:");
-		for(int i = 1; i <= litnum; i++) {
+		for(int i = 1; i <= F->litnum; i++) {
 			printf("%2d ", i);
 		}
 		printf("\nAssign: ");
-		for(int i = 0; i < litnum; i++) {
-			if(model[i] != UNKNOWN) 
-				printf("%2d ", model[i]);
-			else 
-				printf("%2c", 'N');
+		for(int i = 1; i <= F->litnum; i++) {
+			printf("%2d ", F->assign[i].type);
 		}
 		printf("\n");
-		printf("------------------------------------------------------------\n");
-		
+		// printf("------------------------------------------------------------\n");
 		fprintf(fp, "s 1\nv ");
-		for(int i = 1; i <= litnum; i++){
-			if(model[i-1]==1) fprintf(fp, "%d ", i);
-			else if(model[i-1]==0) fprintf(fp, "-%d ", i);
-			else fprintf(fp, "+-%d ", i);
+		for(int i = 1; i <= F->litnum; i++){
+			if(F->assign[i].type==1) fprintf(fp, "%d ", i);
+			else fprintf(fp, "-%d ", i);
 		}
 	}
 	else if(result==-1){
@@ -67,13 +51,12 @@ void ResultPrint(int result, int model[], int litnum, char *filename,double time
 double Timeout(clock_t start, clock_t finish){
 	return ((double)(finish - start) / CLOCKS_PER_SEC);
 }
-
-void IsAllAssign(int model[], int *result, int litnum){
-	int i;
-	for(i = 0;i < litnum; i++){
-		if(model[i] == UNKNOWN){
-			*result=0;
-			break;
-		}
-	}
-}
+//void IsAllAssign(int model[], int *result, int litnum){
+//	int i;
+//	for(i = 0;i < litnum; i++){
+//		if(model[i] == UNKNOWN){
+//			*result=0;
+//			break;
+//		}
+//	}
+//}

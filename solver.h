@@ -1,4 +1,4 @@
-#include "cnfparser.h"
+#include "display.h"
 #define TRUE 1
 #define FALSE 0
 
