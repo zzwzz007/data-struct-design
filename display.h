@@ -1,4 +1,3 @@
-
 #include "cnfparser.h"
 
 void PrintMenu(int n){
@@ -51,12 +50,3 @@ void ResultPrint(int result, Formula *F, char *filename,double time) {
 double Timeout(clock_t start, clock_t finish){
 	return ((double)(finish - start) / CLOCKS_PER_SEC);
 }
-//void IsAllAssign(int model[], int *result, int litnum){
-//	int i;
-//	for(i = 0;i < litnum; i++){
-//		if(model[i] == UNKNOWN){
-//			*result=0;
-//			break;
-//		}
-//	}
-//}
