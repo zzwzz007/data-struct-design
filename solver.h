@@ -45,7 +45,7 @@ void SetVar(Formula *F,int v) {
 		int j = F->lit[p][q].in_clauses[i];//遍历
 		if(F->cla[j].is_satisfied == YES) continue;
 		F->cla[j].is_satisfied = YES;
-		F->cur_clunum--;
+		F->cur_clanum--;
 		F->changes[F->changes_index].clause_index = j;
 		F->changes_index++;
 		F->n_changes[F->depth][SAT]++;
@@ -104,7 +104,7 @@ void UnSetVar(Formula *F, int v) {
 	while(F->n_changes[F->depth][SAT]) {
 		F->n_changes[F->depth][SAT]--;
 		F->changes_index--;
-		F->cur_clunum++;
+		F->cur_clanum++;
 		int j = F->changes[F->changes_index].clause_index;
 		F->cla[j].is_satisfied = NO;
 	}
@@ -146,8 +146,27 @@ int dpll(Formula *F) {
 		else break;
 	}
 	//branch rule
-	if(!F->cur_clunum) return SAT;
-	int v = GetNextlit(F);
+	if(!F->cur_clanum) return SAT;
+	int v ;
+	if(F->original_lit==0)
+		v= GetNextlit(F);
+	else{
+		v=F->cla[F->current_lit].literals[1];
+		F->current_lit++;
+		F->original_lit--;
+	}
+	if(F->assign[Abs(v)].type!=UNASSIGNED){
+		for(int i=1;i<F->clanum;i++){
+			if(F->cla[i].is_satisfied==NO)
+				printf("%d  ",i);
+		}
+		printf("!!!\n%d\n",F->cur_clanum);
+		for(int j=1;j<=36;j++){
+			printf("%2d  ", F->assign[j].type);
+			if(j%6==0) printf("\n");
+		}
+		getchar();
+	}
 	F->assign[Abs(v)].type = v > 0 ? YES : NO;
 	F->assign[Abs(v)].depth = F->depth;
 	F->assign[Abs(v)].decision = BRANCHED;
