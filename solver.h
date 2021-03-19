@@ -1,232 +1,211 @@
-#include "cnfparser.h"
+#include "display.h"
 
-int Abs(int num) {
-	return num > 0 ? num : -num;
+int logto2(int num) {
+	int res = 1;
+	while(num > 1) {
+		num /= 2;
+		res++;
+	}
+	return res;
 }
-status IsEmptyClause(Clause *C) {
-	if(C->firstliteral==NULL) 
-		return YES;
-	else 
-		return NO;
-}//IsEmptyClause
-status IsUnitClause(Clause *C) {
-	if(C->firstliteral && !C->firstliteral->nextliteral) 
-		return YES;
-	else 
-		return NO;
-}//IsUnitClause
-Clause *CopyClause(Clause *C) {
-	Clause *ccopy = (Clause *)malloc(sizeof(Clause));
-	ccopy->nextclause = NULL;
-	if (IsEmptyClause(C)) {
-		//empty clause
-		ccopy->firstliteral = NULL;
-		return ccopy;
-	}//if
-	ccopy->firstliteral = (Literal *)malloc(sizeof(Literal));
-	Literal *lit = C->firstliteral, *litnew = ccopy->firstliteral;
-	while(lit) {
-		litnew->data = lit->data;
-		if (!lit->nextliteral) {
-			//end current clause
-			litnew->nextliteral = NULL;
-			break;
-		}//if
-		litnew->nextliteral = (Literal *)malloc(sizeof(Literal));
-		litnew = litnew->nextliteral;
-		lit = lit->nextliteral;
-	}//while
-	return ccopy;
-}//CopyClause
-Clause *CopyFormula(Clause *F) {
-	Clause *Fcopy = CopyClause(F);
-	Clause *cla = F->nextclause, *clanew = Fcopy;
-	while (cla) {
-		clanew->nextclause = CopyClause(cla);
-		if (!cla->nextclause) break;//end formula
-		clanew = clanew->nextclause;
-		cla = cla->nextclause;
-	}//while
-	return Fcopy;
-}//CopyFormula
-status Removeliteral(Clause **C,Literal **prelit,Literal **lit) {
-	if((*lit)==(*C)->firstliteral) {
-		//first lit
-		(*C)->firstliteral = (*C)->firstliteral->nextliteral;
-		free((*lit));
-		if (IsEmptyClause((*C))) {
-			//fail
-			return ERROR;
-		}//if empty
-		(*lit) = (*C)->firstliteral;
-	} else {
-		//latter lit
-		(*prelit)->nextliteral = (*lit)->nextliteral;
-		free((*lit));
-		(*lit) = (*prelit)->nextliteral;
-	}//if lit
-	return YES;
-}//Removeliteral
-status DestroyClause(Clause **F,Clause **precla,Clause **cla) {
-	Literal *firstlit = (*cla)->firstliteral;
-	//moveclause
-	if((*cla)==*F) {
-		//first clause
-		*F = (*F)->nextclause;
-		free((*cla));
-		(*cla) = (*F);
-		if (*F == NULL) return FINISHED;// finish dpll.
-	}
-	else {
-		//latter lit
-		(*precla)->nextclause = (*cla)->nextclause;
-		free((*cla));
-		(*cla) = (*precla)->nextclause;
-	} //if
-	Literal * lit = NULL;
-	//move literal
-	while(firstlit) {
-		lit = firstlit;
-		firstlit = firstlit->nextliteral;
-		free(lit);
-	}//while
-	return NO;//not finished
-}//DestroyClause
-status SortFormula(Clause **F, int num) {
-	Clause *cla = *F, *precla = *F;
-	Literal *lit, *prelit;
-	int flag;
-	while (cla) {
-		if (IsEmptyClause(cla)) 
-			return ERROR;
-		flag = 0;//if del cla
-		lit = cla->firstliteral;
-		prelit = cla->firstliteral;
-		while(lit) {
-			if (lit->data == -num) {
-				//del lit
-				if (Removeliteral(&cla,&prelit,&lit)==ERROR) 
-					return ERROR;
-				continue;
-			} else if (lit->data == num) {
-				//cla ok, del cla
-				if(DestroyClause(F,&precla,&cla)==FINISHED) 
-					return FINISHED;
-				flag = 1;//del
-				break;
+int GetNextlit(Formula *F){
+	int max = 0,rec,more;
+	for(int i = 1;i <= F->litnum;i++){
+		if(F->assign[i].decision == NONE){
+			rec = F->lit[i][0].occur + F->lit[i][1].occur;
+			if(rec>max){
+				max = rec;
+				if(F->lit[i][0].occur > F->lit[i][1].occur)//more -
+					more = -i;
+				else more = i;
 			}
-			prelit = lit;
-			lit = lit->nextliteral;
-		}
-		if (!flag) {
-			//del cla
-			precla = cla;
-			cla = cla->nextclause;
 		}
 	}
-	return 0;
-}//SortFormula
-void DestroyFormula(Clause * F) {
-	Clause *cla = F, *precla = NULL;
-	Literal *lit = NULL;
-	while (cla) {
-		//des cla
-		Literal *pre = NULL;
-		lit = cla->firstliteral;
-		while(lit) {
-			//des lit
-			pre = lit;
-			lit = lit->nextliteral;
-			free(pre);
+	return more;
+}
+void UpdateTrackback(Formula *F, int *max_depth){
+	int i,j,m;
+	while(F->n_study) {
+		F->n_study--;
+		i = F->study_stack[F->n_study];
+		j = F->cla[i].original_length;
+		for(int k=1; k <= j; ++k) {
+			m = Abs(F->cla[i].literals[k]);
+			if(F->assign[m].decision == BRANCHED &&
+			        F->assign[m].depth > *max_depth)
+				*max_depth = F->assign[m].depth;
 		}
-		precla = cla;
-		cla = cla->nextclause;
-		free(precla);
 	}
-}//DestroyFormula
-void AddClause(Clause ** F, int data) {
-	//add at the head
-	Clause *c = (Clause *)malloc(sizeof(Clause));
-	c->firstliteral = (Literal *)malloc(sizeof(Literal));
-	c->firstliteral->data = data;
-	c->firstliteral->nextliteral = NULL;
-	c->nextclause = (*F);
-	*F = c;
-}//AddClause
-int Nextliteral(Clause * F, int litnum) {
-	//get next lit
-	int max = 0, next = 0;
-	Clause *cla;
-	Literal *lit;
-	for (int i = 1; i <= litnum; i++) {
-		//find the most
-		int posnum = 0, negnum = 0;
-		cla = F;
-		lit = NULL;
-		while (cla) {
-			lit = cla->firstliteral;
-			while(lit) {
-				if (lit->data == i) {
-					posnum ++;
-				} else if (lit->data == -i) {
-					negnum ++;
-				}
-				lit = lit->nextliteral;
+}
+void SetVar(Formula *F,int v) {
+	int i;
+	int p = Abs(v), q = Symbol(v);
+	for(i = 0; i < F->lit[p][q].occur; i++) {
+		//遍历所有含v的子句
+		int j = F->lit[p][q].in_clauses[i];//遍历
+		if(F->cla[j].is_satisfied == YES) continue;
+		F->cla[j].is_satisfied = YES;
+		F->cur_clanum--;
+		F->changes[F->changes_index].clause_index = j;
+		F->changes_index++;
+		F->n_changes[F->depth][SAT]++;
+	}
+	q = !q;
+	for(i = 0; i < F->lit[p][q].occur; i++) {
+		int j = F->lit[p][q].in_clauses[i];
+		if(F->cla[j].is_satisfied == YES ) continue;
+		int k = F->lit[p][q].in_locs[i];
+		F->cla[j].current_length--;
+		F->cla[j].binary_code -= ((1 << (k-1)));
+		F->changes[F->changes_index].clause_index = j;
+		F->changes[F->changes_index++].literal_index = k;
+		F->n_changes[F->depth][UNSAT]++;
+		if(F->cla[j].current_length == 1) {
+			int loc = logto2(F->cla[j].binary_code);
+			int w = F->cla[j].literals[loc];
+			int s = Abs(w), t = Symbol(w);
+			F->lit[s][t].unit_loc = j;
+			if(F->lit[s][(!t)].is_unit == YES) {
+				F->is_unit_unsat = YES;
+				F->unsat_ucl = w;
+			} else if(F->lit[s][t].is_unit == NO) {
+				F->gucl_stack[F->n_gucl] = w;
+				F->cla[j].current_ucl = w;
+				F->lit[s][t].is_unit = YES;
+				F->n_gucl++;
 			}
-			cla = cla->nextclause;
-		}
-		if (negnum + posnum > max) {
-			next = posnum > negnum ? i : -i;
-			max = negnum + posnum;
 		}
 	}
-	return next;
-}//Nextliteral
-status DPLL(Clause * F, int litnum, int model[]) {
-	//dpll algorithm
-	Clause * Fornew = CopyFormula(F);//copy the former formula
-	Clause *cla;
-	Literal *lit;
-	while (1) {
-		//unit rule
-		cla = Fornew;
-		lit = NULL;
-		int flag = 0;//record if unit
-		while (cla) {
-			//not finished
-			if (IsEmptyClause(cla)) {
-				//empty clause,error
-				DestroyFormula(Fornew);
-				return ERROR;
+	if(F->depth && F->backtrack_level == F->depth-1)
+		F->backtrack_level++;
+	F->depth++;
+	F->lit[p][q].assign = YES;
+	F->lit[p][!q].assign = YES;
+}
+void UnSetVar(Formula *F, int v) {
+	int p = abs(v);
+	F->depth--;
+	if(F->depth && F->backtrack_level == F->depth)
+		F->backtrack_level--;
+	while(F->n_changes[F->depth][UNSAT]) {
+		F->n_changes[F->depth][UNSAT]--;
+		F->changes_index--;
+		int j = F->changes[F->changes_index].clause_index;
+		int k = F->changes[F->changes_index].literal_index;
+		F->cla[j].current_length++;
+		if(F->cla[j].current_length == 2) {
+			int s = abs(F->cla[j].current_ucl);
+			int t = Symbol(F->cla[j].current_ucl);
+			F->lit[s][t].is_unit = NO;
+			F->cla[j].current_ucl = 0;
+		}
+		F->cla[j].binary_code += ((1 << (k-1)));
+	}
+	while(F->n_changes[F->depth][SAT]) {
+		F->n_changes[F->depth][SAT]--;
+		F->changes_index--;
+		F->cur_clanum++;
+		int j = F->changes[F->changes_index].clause_index;
+		F->cla[j].is_satisfied = NO;
+	}
+	F->lit[p][SAT].assign = NO;
+	F->lit[p][UNSAT].assign = NO;
+}
+int dpll(Formula *F) {
+	int *lucl_stack ;
+	lucl_stack = (int *)malloc(sizeof(int));
+	int n_lucl = 0;
+	while(1) {
+		if(F->is_unit_unsat) {
+			F->n_study = 0;
+			int cl = Abs(F->unsat_ucl);
+			F->study_stack[F->n_study++] = F->lit[cl][SAT].unit_loc;
+			F->study_stack[F->n_study++] = F->lit[cl][UNSAT].unit_loc;
+			F->assign[cl].decision = NONE;
+			F->assign[cl].type = UNASSIGNED;
+			while(n_lucl) {
+				UnSetVar(F,lucl_stack[--n_lucl]);
+				int s = Abs(lucl_stack[n_lucl]);
+				int t = Symbol(lucl_stack[n_lucl]);
+				F->study_stack[F->n_study++] = F->lit[s][t].unit_loc;
+				F->assign[s].type = UNASSIGNED;
+				F->assign[s].decision = NONE;
 			}
-			lit = cla->firstliteral;
-			if (IsUnitClause(cla)) {
-				//unit clause
-				int value = lit->data > 0 ? 1 : 0;//judge pos or neg
-				model[Abs(lit->data) - 1] = value;//assign literal
-				flag = 1;//is unit
-				int result = SortFormula(&Fornew, lit->data);
-				if (result) return result;//FINISHED or ERROR
-				break;
-			} //if
-			cla = cla->nextclause;
-		}//while
-		if (!flag) break;//not exist unit
+			F->is_unit_unsat = NO;
+			free(lucl_stack);
+			F->n_gucl = 0;
+			return UNSAT;
+		} else if (F->n_gucl) {
+			lucl_stack = (int*)realloc(lucl_stack,(n_lucl+1)*sizeof(int));
+			int nextlit = F->gucl_stack[--F->n_gucl];
+			lucl_stack[n_lucl++] = nextlit;
+			F->assign[Abs(nextlit)].type = Symbol(nextlit);
+			F->assign[Abs(nextlit)].decision = IMPLIED;
+			SetVar(F,nextlit);
+		} 
+		else break;
 	}
-	if (!Fornew) return FINISHED;// empty, success.
-	int litnext = Nextliteral(Fornew, litnum);// choose next lit
-	AddClause(&Fornew, litnext);
-	if(DPLL(Fornew, litnum, model) == 1) {
-		//ok
-		DestroyFormula(Fornew);
-		return FINISHED;
-	} else {
-		//error,change the assign
-		Clause *bak = Fornew;
-		Fornew = Fornew->nextclause;
-		free(bak->firstliteral);
-		free(bak);//delete the former assign
-		AddClause(&Fornew, -litnext);
-		return DPLL(Fornew, litnum, model);
+	//branch rule
+	if(!F->cur_clanum) return SAT;
+	int v ;
+	if(F->original_lit==0)
+		v= GetNextlit(F);
+	else{
+		v=F->cla[F->current_lit].literals[1];
+		F->current_lit++;
+		F->original_lit--;
 	}
-}//DPLL
+	if(F->assign[Abs(v)].type!=UNASSIGNED){
+		for(int i=1;i<F->clanum;i++){
+			if(F->cla[i].is_satisfied==NO)
+				printf("%d  ",i);
+		}
+		printf("!!!\n%d\n",F->cur_clanum);
+		for(int j=1;j<=36;j++){
+			printf("%2d  ", F->assign[j].type);
+			if(j%6==0) printf("\n");
+		}
+		getchar();
+	}
+	F->assign[Abs(v)].type = v > 0 ? YES : NO;
+	F->assign[Abs(v)].depth = F->depth;
+	F->assign[Abs(v)].decision = BRANCHED;
+	SetVar(F,v);
+	if(dpll(F)) return SAT;
+	//error
+	UnSetVar(F,v);
+	// F->assign[Abs(v)].type = UNASSIGNED;
+	int max_depth = 0,  left = NO;
+	if(F->n_study) {
+		UpdateTrackback(F, &max_depth);
+		left = YES;
+	}
+	F->assign[Abs(v)].decision = NONE;
+	// ++n_backtracks;
+	if(F->backtrack_level >= F->depth-1) {
+		F->assign[Abs(v)].type = !F->assign[Abs(v)].type;
+		F->assign[Abs(v)].decision = IMPLIED;
+		SetVar(F,-v);
+		if(dpll(F)) return SAT;
+		UnSetVar(F,-v);
+		F->assign[Abs(v)].type = UNASSIGNED;
+		F->assign[Abs(v)].decision = NONE;
+		if(left && F->n_study) {
+			UpdateTrackback(F, &max_depth);
+			if(max_depth < F->backtrack_level)
+				F->backtrack_level = max_depth;
+		}
+	}
+	F->n_study = 0;
+	while(n_lucl) {
+		n_lucl--;
+		int v = lucl_stack[n_lucl];
+		UnSetVar(F,v);
+		F->assign[Abs(v)].type = UNASSIGNED;
+		F->assign[Abs(v)].decision = NONE;
+	}
+	free(lucl_stack);
+	F->is_unit_unsat = NO;
+	return UNSAT;
+}
+

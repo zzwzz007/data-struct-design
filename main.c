@@ -1,37 +1,37 @@
-#include "solver.h"
+#include "BinaryPuzzle.h"
 
 int main() {
-	PrintMenu(1);
-	PrintMenu(2);
-	char filename[30];
+	PrintMenu(0);
+	int n;
+	scanf("%d",&n);
+	PrintMenu(n);
+	char filename[80];
+	clock_t start,finish;
+	int result;
+	Formula *F;
 	scanf("%s",filename);
 	int last;
-	for (last = 0; last < 30; last++)
-	{
+	for (last = 0; last < 80; last++)
 		if(filename[last]=='\0') break;
+	Readcnf(filename,last);
+	int num=6;
+	switch(n){
+		case 1:
+			F = ReadToFormula(filename);
+			start = clock();
+			result = dpll(F);
+			finish = clock();
+			break;
+		case 2:
+			F = ReadToSudoku(num,filename);
+			start = clock();
+			result = dpll(F);
+			finish = clock();
+			break;
 	}
-	filename[last]='.';
-	filename[last+1]='c';
-	filename[last+2]='n';
-	filename[last+3]='f';
-	filename[last+4]='\0';//rename
-	int litnum,clunum;
-	Clause  *F=ReadToFormula(filename,&litnum,&clunum);
-	int *model = (int *)malloc(litnum * sizeof(int));
-	for (int i = 0; i < litnum; i++)
-		model[i] = UNKNOWN;
-	clock_t start,finish;
-	start = clock();
-	int result = DPLL(F, litnum, model);
-	finish = clock();
-	IsAllAssign(model, &result, litnum);
 	double t=Timeout(start,finish);
-	filename[last]='.';
-	filename[last+1]='r';
-	filename[last+2]='e';
-	filename[last+3]='s';
-	filename[last+4]='\0';//rename
-	ResultPrint(result, model, litnum, filename, t);
-	printf("Spent time:%lf s (CLOCKS_PER_SEC=%ld)", t ,CLOCKS_PER_SEC);
+	Writeres(filename, last);
+	ResultPrint(result, F, filename, t, n, num);
+	printf("Spent time:%lf s (CLOCKS_PER_SEC=%d)\n", t ,CLOCKS_PER_SEC);
 	return 0;
 }
